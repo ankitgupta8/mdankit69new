@@ -42,9 +42,13 @@ const Header = ({ className }) => {
     if (candidateTitle) {
       const currentTitle = document.title;
       document.title = candidateTitle;
-      window.requestAnimationFrame(() => {
+
+      // Restore the original title only after the print dialog closes
+      const restoreTitle = () => {
         document.title = currentTitle;
-      });
+        window.removeEventListener("afterprint", restoreTitle);
+      };
+      window.addEventListener("afterprint", restoreTitle);
     }
     window.print();
   };
