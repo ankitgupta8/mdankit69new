@@ -43,12 +43,21 @@ const Header = ({ className }) => {
       const currentTitle = document.title;
       document.title = candidateTitle;
 
-      // Restore the original title only after the print dialog closes
+      let restored = false;
       const restoreTitle = () => {
+        if (restored) return;
+        restored = true;
         document.title = currentTitle;
         window.removeEventListener("afterprint", restoreTitle);
       };
+
+      // Restore title after print dialog closes (desktop browsers)
       window.addEventListener("afterprint", restoreTitle);
+
+      // Fallback for mobile browsers where afterprint may not fire reliably.
+      // Use a longer delay so the browser has time to capture the title
+      // before it is restored.
+      setTimeout(restoreTitle, 5000);
     }
     window.print();
   };
