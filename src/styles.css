@@ -1,0 +1,59 @@
+html,
+body,
+#root {
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+@media screen and (max-width: 380px) {
+  .header .menu-center {
+    display: none !important;
+  }
+}
+
+@media screen and (max-width: 2000px) {
+  #root {
+    height: calc(100vh - 40px);
+    width: 100%;
+  }
+}
+@media screen and (max-width: 719px) {
+  #root {
+    height: 100% !important;
+    width: 100%;
+  }
+  .editor-container {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+  } 
+  .markdown-editor {
+    width: 100%;
+  }
+  .dtYFPN {
+    width: 100% !important;
+  }
+}
+/* For webkit-based browsers */
+::-webkit-scrollbar {
+  width: 8px; 
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: black; 
+}
+
+::-webkit-scrollbar-track {
+  background-color: #f1f1f1; 
+}
+
+/* For Firefox */
+/* For nonwebkit-based browsers */
+scrollbar-color: #4CAF50 #f1f1f1;
+scrollbar-width: thin;
