@@ -1,24 +1,48 @@
 import React from "react";
 import styled from "styled-components";
+import { useProvided } from "nonaction";
+import { TextContainer } from "../../Container";
 import UploadButton from "./Upload.js";
 import ThemeSelector from "./ThemeSelector.js";
 import PdfSettings from "./PdfSettings.js";
 import downloadimage from '../../assets/img/downloadpdf.png'
 
-const Header = ({ className }) => {
-  const onTransfrom = () => {
-    // get the file name
-    let candidateTitle = "";
-    const previewEl = document.querySelector(".preview");
-    const candidateTitleEl = previewEl.querySelector("h1");
-    if (candidateTitleEl) {
-      candidateTitle = candidateTitleEl.innerText;
+/**
+ * Extract a clean filename from the first non-empty line of markdown text.
+ * Strips heading markers (#), leading/trailing whitespace, and characters
+ * that are invalid in filenames.
+ */
+function extractTitle(markdownText) {
+  if (!markdownText) return "";
+  const lines = markdownText.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    // Strip heading markers and whitespace
+    const cleaned = lines[i]
+      .replace(/^#{1,6}\s*/, "")  // remove leading # symbols
+      .replace(/^\s*[-*>]+\s*/, "") // remove leading list/blockquote markers
+      .replace(/\*{1,2}|_{1,2}|`{1,3}|~{2}/g, "") // remove bold/italic/code/strikethrough markers
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // extract link text from [text](url)
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1") // extract alt text from ![alt](url)
+      .trim();
+    if (cleaned.length > 0) {
+      // Remove characters invalid in filenames
+      return cleaned.replace(/[<>:"/\\|?*]/g, "").trim();
+    }
+  }
+  return "";
+}
 
-      // do the effect change the title
+const Header = ({ className }) => {
+  const [text] = useProvided(TextContainer);
+
+  const onTransfrom = () => {
+    // Extract filename from the first line of the markdown text
+    const candidateTitle = extractTitle(text);
+
+    if (candidateTitle) {
       const currentTitle = document.title;
       document.title = candidateTitle;
       window.requestAnimationFrame(() => {
-        // schedule resume back in next frame
         document.title = currentTitle;
       });
     }
