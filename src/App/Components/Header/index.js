@@ -38,11 +38,9 @@ const Header = ({ className }) => {
   const onTransfrom = () => {
     // Extract filename from the first line of the markdown text
     const candidateTitle = extractTitle(text);
+    const currentTitle = document.title;
 
-    if (candidateTitle) {
-      const currentTitle = document.title;
-      document.title = candidateTitle;
-
+    const triggerPrint = () => {
       let restored = false;
       const restoreTitle = () => {
         if (restored) return;
@@ -55,11 +53,26 @@ const Header = ({ className }) => {
       window.addEventListener("afterprint", restoreTitle);
 
       // Fallback for mobile browsers where afterprint may not fire reliably.
-      // Use a longer delay so the browser has time to capture the title
-      // before it is restored.
       setTimeout(restoreTitle, 5000);
+
+      window.print();
+    };
+
+    if (candidateTitle) {
+      document.title = candidateTitle;
+
+      // On mobile/tablet browsers, window.print() can fire before the
+      // document.title change is picked up by the print dialog, causing
+      // the PDF to be saved as "mdtopdf - Markdown to PDF.pdf" instead
+      // of the extracted title.  Using requestAnimationFrame followed by
+      // setTimeout(0) ensures the browser has flushed the title update
+      // to the UI before the print dialog reads it.
+      requestAnimationFrame(() => {
+        setTimeout(triggerPrint, 0);
+      });
+    } else {
+      triggerPrint();
     }
-    window.print();
   };
   return (
     <header className={className + " no-print header"}>
