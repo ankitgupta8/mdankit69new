@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import styled from "styled-components";
 import { useProvided } from "nonaction";
-import { ThemeContainer } from "../../Container";
+import { ThemeContainer, PdfSettingsContainer } from "../../Container";
 import pdfThemes from "../../Lib/pdfThemes";
 import { injectThemeStyle } from "../../Lib/themeStyles";
 
 const ThemeSelector = ({ className }) => {
   const [currentTheme, setCurrentTheme] = useProvided(ThemeContainer);
+  const [pdfSettings] = useProvided(PdfSettingsContainer);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -23,7 +24,7 @@ const ThemeSelector = ({ className }) => {
 
   const handleThemeChange = (themeKey) => {
     setCurrentTheme(themeKey);
-    injectThemeStyle(themeKey);
+    injectThemeStyle(themeKey, pdfSettings);
     setIsOpen(false);
   };
 

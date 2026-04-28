@@ -2,6 +2,7 @@ import React from "react";
 import styled from "styled-components";
 import UploadButton from "./Upload.js";
 import ThemeSelector from "./ThemeSelector.js";
+import PdfSettings from "./PdfSettings.js";
 import downloadimage from '../../assets/img/downloadpdf.png'
 
 const Header = ({ className }) => {
@@ -31,6 +32,7 @@ const Header = ({ className }) => {
         <UploadButton className="button upload" />
       </div>
       <div className="buttons">
+        <PdfSettings />
         <ThemeSelector />
         <button onClick={onTransfrom} className="shadow download-btn">Download <img src={downloadimage} alt="Download Icon"  height={"20px"} style={{  filter: "invert(100%)", paddingLeft: "5px"}} rel="noreferrer" /></button>  
       </div>

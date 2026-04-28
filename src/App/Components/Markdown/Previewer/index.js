@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect } from 'react';
 import styled from 'styled-components';
 import { useProvided } from 'nonaction';
-import { ThemeContainer } from '../../../Container';
+import { ThemeContainer, PdfSettingsContainer } from '../../../Container';
 import { injectThemeStyle } from '../../../Lib/themeStyles';
 import Loading from './Loading';
 import ErrorBoundary from './ErrorBoundary.js';
@@ -19,11 +19,12 @@ const Wrapper = styled.div`
 const LazyPreview = lazy(() => import('./Preview.js'));
 const MarkdownPreviewerBody = ({ source, children }) => {
   const [currentTheme] = useProvided(ThemeContainer);
+  const [pdfSettings] = useProvided(PdfSettingsContainer);
 
-  // Inject theme CSS on mount and when theme changes
+  // Inject theme CSS on mount and when theme or settings change
   useEffect(() => {
-    injectThemeStyle(currentTheme);
-  }, [currentTheme]);
+    injectThemeStyle(currentTheme, pdfSettings);
+  }, [currentTheme, pdfSettings]);
 
   return (
     <ErrorBoundary>

@@ -1,42 +1,145 @@
 /**
  * Generates CSS string from a theme configuration object.
  * Applied to the preview pane and used for print/PDF output.
+ *
+ * Accepts optional pdfSettings:
+ *   fontScale   — multiplier for all font sizes (0.6–1.4)
+ *   imageScale  — max-width percentage for images (25–100)
+ *   spacingMode — "compact" | "comfortable" | "spacious"
  */
 import pdfThemes from './pdfThemes';
 
 /**
- * Build a complete CSS string for a given theme key.
- * The CSS targets `.preview.themed` to scope styles properly.
+ * Parse a CSS font-size value like "15px" or "1.6em" and scale it.
  */
-export function generateThemeCSS(themeKey) {
+function scaleFontSize(sizeStr, scale) {
+  if (scale === 1) return sizeStr;
+  const match = sizeStr.match(/^([\d.]+)(px|em|rem|%)$/);
+  if (!match) return sizeStr;
+  const num = parseFloat(match[1]);
+  const unit = match[2];
+  return `${(num * scale).toFixed(2)}${unit}`;
+}
+
+/**
+ * Spacing multipliers per mode.
+ * These scale margins, paddings, and line-height relative to the theme defaults.
+ */
+const SPACING = {
+  compact:     { marginScale: 0.5,  lineHeightAdd: -0.15, tablePad: 0.65, blockMargin: 0.5  },
+  comfortable: { marginScale: 0.8,  lineHeightAdd: 0,     tablePad: 0.85, blockMargin: 0.8  },
+  spacious:    { marginScale: 1.0,  lineHeightAdd: 0.1,   tablePad: 1.0,  blockMargin: 1.0  },
+};
+
+/**
+ * Build a complete CSS string for a given theme key + settings.
+ */
+export function generateThemeCSS(themeKey, pdfSettings) {
   const theme = pdfThemes[themeKey];
   if (!theme) return '';
 
+  const fontScale = (pdfSettings && pdfSettings.fontScale) || 1.0;
+  const imageScale = (pdfSettings && pdfSettings.imageScale != null) ? pdfSettings.imageScale : 100;
+  const spacingMode = (pdfSettings && pdfSettings.spacingMode) || 'comfortable';
+  const sp = SPACING[spacingMode] || SPACING.comfortable;
+
   const scope = '.preview.themed';
+
+  // Scaled base font size
+  const baseFontSize = scaleFontSize(theme.fontSize, fontScale);
+  // Adjusted line height
+  const baseLineHeight = (parseFloat(theme.lineHeight) + sp.lineHeightAdd).toFixed(2);
 
   const headingCSS = (tag, config) => {
     const props = [];
     if (config.color) props.push(`color: ${config.color}`);
-    if (config.fontSize) props.push(`font-size: ${config.fontSize}`);
+    if (config.fontSize) props.push(`font-size: ${scaleFontSize(config.fontSize, fontScale)}`);
     if (config.fontWeight) props.push(`font-weight: ${config.fontWeight}`);
     if (config.borderBottom) props.push(`border-bottom: ${config.borderBottom}`);
     if (config.paddingBottom) props.push(`padding-bottom: ${config.paddingBottom}`);
-    if (config.marginTop) props.push(`margin-top: ${config.marginTop}`);
+    if (config.marginTop) {
+      const mt = parseFloat(config.marginTop) * sp.marginScale;
+      props.push(`margin-top: ${mt.toFixed(2)}em`);
+    }
     if (config.textTransform) props.push(`text-transform: ${config.textTransform}`);
     if (config.letterSpacing) props.push(`letter-spacing: ${config.letterSpacing}`);
     if (config.fontStyle) props.push(`font-style: ${config.fontStyle}`);
-    props.push('margin-bottom: 0.6em');
+    const mb = (0.6 * sp.marginScale).toFixed(2);
+    props.push(`margin-bottom: ${mb}em`);
     props.push(`font-family: ${theme.fontFamily}`);
     return `${scope} ${tag} { ${props.join('; ')}; }`;
   };
 
+  // Paragraph margin
+  const pMargin = (1.0 * sp.blockMargin).toFixed(2);
+  // List item margin
+  const liMargin = (0.35 * sp.marginScale).toFixed(2);
+  // Block margin (code, blockquote, table)
+  const blockMargin = (1.2 * sp.blockMargin).toFixed(2);
+  const tableMargin = (1.5 * sp.blockMargin).toFixed(2);
+  // Table cell padding scaled
+  const thPadV = Math.round(12 * sp.tablePad);
+  const thPadH = Math.round(16 * sp.tablePad);
+  const tdPadV = Math.round(10 * sp.tablePad);
+  const tdPadH = Math.round(16 * sp.tablePad);
+  // Code block padding
+  const codePadNum = Math.round(16 * sp.tablePad);
+
+  // Page-break rules per spacing mode
+  let pageBreakCSS_print = '';
+  if (spacingMode === 'compact') {
+    // No page-break-avoid at all — everything flows naturally, no blank pages
+    pageBreakCSS_print = `
+      ${scope} table { page-break-inside: auto !important; }
+      ${scope} thead { display: table-header-group; }
+      ${scope} tr { page-break-inside: auto; }
+      ${scope} pre { page-break-inside: auto !important; }
+      ${scope} blockquote { page-break-inside: auto !important; }
+      ${scope} img { page-break-inside: auto !important; }
+      ${scope} h1, ${scope} h2, ${scope} h3,
+      ${scope} h4, ${scope} h5, ${scope} h6 {
+        page-break-after: auto;
+        page-break-inside: auto;
+      }
+    `;
+  } else if (spacingMode === 'comfortable') {
+    // Only headings avoid page breaks; tables/figures can split
+    pageBreakCSS_print = `
+      ${scope} table { page-break-inside: auto !important; }
+      ${scope} thead { display: table-header-group; }
+      ${scope} tr { page-break-inside: auto; }
+      ${scope} pre { page-break-inside: auto !important; }
+      ${scope} blockquote { page-break-inside: auto !important; }
+      ${scope} img { page-break-inside: avoid; }
+      ${scope} h1, ${scope} h2, ${scope} h3,
+      ${scope} h4, ${scope} h5, ${scope} h6 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+    `;
+  } else {
+    // spacious — avoid page breaks on everything (original behavior)
+    pageBreakCSS_print = `
+      ${scope} table { page-break-inside: avoid; }
+      ${scope} thead { display: table-header-group; }
+      ${scope} pre { page-break-inside: avoid; }
+      ${scope} blockquote { page-break-inside: avoid; }
+      ${scope} img { page-break-inside: avoid; }
+      ${scope} h1, ${scope} h2, ${scope} h3,
+      ${scope} h4, ${scope} h5, ${scope} h6 {
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+    `;
+  }
+
   return `
-    /* ===== Theme: ${theme.name} ===== */
+    /* ===== Theme: ${theme.name} | Scale: ${fontScale} | Images: ${imageScale}% | Spacing: ${spacingMode} ===== */
 
     ${scope} {
       font-family: ${theme.fontFamily} !important;
-      font-size: ${theme.fontSize} !important;
-      line-height: ${theme.lineHeight} !important;
+      font-size: ${baseFontSize} !important;
+      line-height: ${baseLineHeight} !important;
       color: ${theme.textColor} !important;
       background-color: ${theme.backgroundColor} !important;
       padding: 24px 32px !important;
@@ -58,21 +161,21 @@ export function generateThemeCSS(themeKey) {
 
     /* Paragraphs */
     ${scope} p {
-      margin-bottom: 1em;
-      line-height: ${theme.lineHeight};
+      margin-bottom: ${pMargin}em;
+      line-height: ${baseLineHeight};
     }
 
     /* Lists */
     ${scope} ul, ${scope} ol {
       padding-left: 2em;
-      margin-bottom: 1em;
+      margin-bottom: ${pMargin}em;
     }
     ${scope} li {
-      margin-bottom: 0.35em;
-      line-height: ${theme.lineHeight};
+      margin-bottom: ${liMargin}em;
+      line-height: ${baseLineHeight};
     }
     ${scope} li > ul, ${scope} li > ol {
-      margin-top: 0.35em;
+      margin-top: ${liMargin}em;
       margin-bottom: 0;
     }
 
@@ -90,13 +193,13 @@ export function generateThemeCSS(themeKey) {
       background: ${theme.codeBlock.background} !important;
       border: ${theme.codeBlock.border} !important;
       border-radius: ${theme.codeBlock.borderRadius} !important;
-      padding: ${theme.codeBlock.padding} !important;
+      padding: ${codePadNum}px !important;
       overflow-x: auto;
-      margin: 1.2em 0;
+      margin: ${blockMargin}em 0;
     }
     ${scope} pre code {
       font-family: ${theme.codeBlock.fontFamily} !important;
-      font-size: ${theme.codeBlock.fontSize} !important;
+      font-size: ${scaleFontSize(theme.codeBlock.fontSize, fontScale)} !important;
       background: transparent !important;
       padding: 0 !important;
       border: none !important;
@@ -112,7 +215,7 @@ export function generateThemeCSS(themeKey) {
       border-radius: ${theme.inlineCode.borderRadius} !important;
       padding: ${theme.inlineCode.padding} !important;
       font-family: ${theme.inlineCode.fontFamily} !important;
-      font-size: ${theme.inlineCode.fontSize} !important;
+      font-size: ${scaleFontSize(theme.inlineCode.fontSize, fontScale)} !important;
     }
 
     /* Blockquotes */
@@ -122,11 +225,11 @@ export function generateThemeCSS(themeKey) {
       color: ${theme.blockquote.color} !important;
       padding: ${theme.blockquote.padding} !important;
       border-radius: ${theme.blockquote.borderRadius} !important;
-      margin: 1.2em 0 !important;
+      margin: ${blockMargin}em 0 !important;
       font-style: normal !important;
     }
     ${scope} blockquote p {
-      margin: 0.4em 0;
+      margin: ${(0.4 * sp.marginScale).toFixed(2)}em 0;
     }
 
     /* Tables */
@@ -134,10 +237,11 @@ export function generateThemeCSS(themeKey) {
       width: 100%;
       border-collapse: separate;
       border-spacing: 0;
-      margin: 1.5em 0;
+      margin: ${tableMargin}em 0;
       border-radius: ${theme.table.borderRadius};
       overflow: hidden;
       border: 1px solid ${theme.table.borderColor};
+      font-size: ${scaleFontSize('1em', fontScale)};
     }
     ${scope} thead tr {
       background-color: ${theme.table.headerBg} !important;
@@ -145,14 +249,14 @@ export function generateThemeCSS(themeKey) {
     ${scope} thead th {
       color: ${theme.table.headerColor} !important;
       font-weight: 600;
-      padding: 12px 16px;
+      padding: ${thPadV}px ${thPadH}px;
       text-align: left;
       border-bottom: 2px solid ${theme.table.borderColor};
-      font-size: 0.92em;
+      font-size: ${scaleFontSize('0.92em', fontScale)};
       letter-spacing: 0.3px;
     }
     ${scope} tbody td {
-      padding: 10px 16px;
+      padding: ${tdPadV}px ${tdPadH}px;
       border-bottom: 1px solid ${theme.table.borderColor};
     }
     ${scope} tbody tr:nth-child(even) {
@@ -169,15 +273,16 @@ export function generateThemeCSS(themeKey) {
     ${scope} hr {
       ${theme.hr.border};
       border-top: ${theme.hr.borderTop};
-      margin: ${theme.hr.margin};
+      margin: ${(parseFloat(theme.hr.margin) * sp.marginScale || 2 * sp.marginScale).toFixed(1)}em 0;
     }
 
     /* Images */
     ${scope} img {
-      max-width: 100%;
-      height: auto;
+      max-width: ${imageScale}% !important;
+      height: auto !important;
       border-radius: 8px;
-      margin: 1em 0;
+      margin: ${blockMargin}em 0;
+      display: block;
     }
 
     /* Strong and emphasis */
@@ -190,7 +295,7 @@ export function generateThemeCSS(themeKey) {
 
     /* Definition lists, details */
     ${scope} details {
-      margin: 1em 0;
+      margin: ${blockMargin}em 0;
       padding: 8px 16px;
       border-radius: 6px;
       background: ${theme.codeBlock.background};
@@ -209,7 +314,7 @@ export function generateThemeCSS(themeKey) {
 
       ${scope} {
         padding: 0 !important;
-        font-size: ${theme.fontSize} !important;
+        font-size: ${baseFontSize} !important;
         background-color: ${theme.backgroundColor} !important;
         color: ${theme.textColor} !important;
         -webkit-print-color-adjust: exact !important;
@@ -220,39 +325,12 @@ export function generateThemeCSS(themeKey) {
       ${scope} pre {
         white-space: pre-wrap !important;
         word-wrap: break-word !important;
-        page-break-inside: avoid;
       }
 
-      ${scope} table {
-        page-break-inside: avoid;
-      }
+      /* Page break rules based on spacing mode */
+      ${pageBreakCSS_print}
 
-      ${scope} thead {
-        display: table-header-group;
-      }
-
-      ${scope} h1, ${scope} h2, ${scope} h3,
-      ${scope} h4, ${scope} h5, ${scope} h6 {
-        page-break-after: avoid;
-        page-break-inside: avoid;
-      }
-
-      ${scope} img {
-        page-break-inside: avoid;
-      }
-
-      ${scope} blockquote {
-        page-break-inside: avoid;
-      }
-
-      /* Page numbers via CSS counters */
-      ${theme.pageNumber ? `
-        ${scope}::after {
-          content: '';
-          display: block;
-        }
-      ` : ''}
-
+      /* Preserve colors in print */
       ${scope} thead tr {
         background-color: ${theme.table.headerBg} !important;
         -webkit-print-color-adjust: exact !important;
@@ -283,7 +361,7 @@ export function generateThemeCSS(themeKey) {
 /**
  * Injects or updates a <style> tag in the document head with the theme CSS.
  */
-export function injectThemeStyle(themeKey) {
+export function injectThemeStyle(themeKey, pdfSettings) {
   const styleId = 'pdf-theme-style';
   let styleEl = document.getElementById(styleId);
   if (!styleEl) {
@@ -291,7 +369,7 @@ export function injectThemeStyle(themeKey) {
     styleEl.id = styleId;
     document.head.appendChild(styleEl);
   }
-  styleEl.textContent = generateThemeCSS(themeKey);
+  styleEl.textContent = generateThemeCSS(themeKey, pdfSettings);
 }
 
 /**
